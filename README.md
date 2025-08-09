@@ -1,21 +1,34 @@
-# Jeu pédagogique BTP - Prototype 3D (Three.js)
+# Jeu pédagogique BTP - 3D + Quiz + HUD
 
-Ce dépôt contient un prototype de visualisation 3D par étapes (terrassement → bâtiment fini).
-Vous pouvez charger jusqu'à 8 étapes (`models/etape1.glb` → `models/etape8.glb`).
+Prototype prêt pour GitHub Pages : visualisation 3D par étapes (`models/etape1.glb` → `models/etape8.glb`), avec **HUD de progression** et **quiz** (2/3 bonnes réponses) pour débloquer l'étape suivante.
 
-## Utilisation rapide (GitHub Pages)
-1. Placez vos fichiers `.glb` dans le dossier `models/` et nommez-les :
-   - `etape1.glb`, `etape2.glb`, …, `etape8.glb` (seules les étapes présentes seront affichées).
-2. Poussez ce dépôt sur GitHub.
-3. Activez **GitHub Pages** dans *Settings → Pages* et choisissez la branche principale (root).
-4. Ouvrez l’URL GitHub Pages fournie : le viewer chargera `models/etape1.glb` par défaut.
+## Modifier les intitulés d'étapes
+Dans `index.html`, tableau `STEPS` :
+```js
+const STEPS = ["Terrassement","Fondations","Superstructure","Planchers","Murs","Menuiseries ext.","Toiture","Finitions"];
+```
 
-> GitHub Pages sert les fichiers via HTTP(s) : aucun serveur local n'est nécessaire en production.
+## Modifier les questions du quiz
+Toujours dans `index.html`, objet `QUIZ` : 3 questions par étape minimum.
+```js
+const QUIZ = {
+  1: [{ q: "Question ...", choices: ["A","B","C"], correct: 0 }, ...],
+  2: [...],
+  ...
+}
+```
+- `choices` = 3 propositions (vous pouvez en mettre plus, l’interface s’adapte).
+- `correct` = index (0, 1, 2, ... ) de la bonne réponse dans `choices`.
 
-## Lancement en local (développement)
-Les navigateurs bloquent le chargement de fichiers via `file://`. Utilisez un **serveur local**.
+## Déploiement sur GitHub Pages
+1. Placez vos `.glb` dans `models/` (ex : `etape1.glb` … `etape8.glb`).
+2. Poussez ce dossier dans un dépôt GitHub.
+3. Activez **Settings → Pages** (branch principale, dossier root).
 
-### Avec Python
+## Lancement local (développement)
+Servez depuis un petit serveur local (sinon les `.glb` ne chargeront pas en `file://`).
+
+### Python
 ```bash
 python -m http.server 8000
 # ou sous Windows
@@ -23,7 +36,7 @@ py -m http.server 8000
 ```
 Puis allez sur `http://localhost:8000`.
 
-### Avec Node.js
+### Node.js
 ```bash
 npx http-server -p 8000
 ```
@@ -31,17 +44,8 @@ npx http-server -p 8000
 ## Structure
 ```
 .
-├── index.html          # Viewer 3D avec cadrage automatique de la caméra
-├── models/             # Placez ici vos .glb : etape1.glb ... etape8.glb
+├── index.html          # Viewer 3D + HUD + Quiz + cadrage auto
+├── models/             # Placez etape1.glb ... etape8.glb ici
 │   └── README.txt
-└── assets/             # (optionnel) images, logos, etc.
+└── assets/             # (Optionnel)
 ```
-
-## Export des modèles
-- **Format** : `.glb` (binaire), textures intégrées.
-- **Unités** : mètres.
-- **Origine** : idéalement centrée (0,0,0). Sinon, le cadrage auto compensera.
-- **Compression** : si vous utilisez la compression **DRACO**, le viewer la supporte.
-
-## Licence
-Libre d’usage pédagogique. Ajoutez votre licence si nécessaire.

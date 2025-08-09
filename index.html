@@ -2,62 +2,232 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <title>Jeu pédagogique BTP - Prototype 3D</title>
+  <title>Jeu pédagogique BTP - 3D + Quiz + HUD</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    html, body { height: 100%; margin: 0; }
+    :root {
+      --bg:#f3f4f6; --panel:#ffffff; --muted:#e5e7eb; --text:#111827;
+      --primary:#2563eb; --primary-dark:#1e40af; --ok:#16a34a; --warn:#d97706; --err:#dc2626;
+    }
+    * { box-sizing: border-box; }
+    html, body { height:100%; margin:0; }
     body {
-      background: #e6e6e6;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      display: flex; flex-direction: column; align-items: stretch;
+      color: var(--text); background: var(--bg);
+      display:grid; grid-template-columns: 260px 1fr; grid-template-rows: auto 1fr auto; grid-template-areas:
+      "sidebar header"
+      "sidebar main"
+      "sidebar footer";
+      min-height:100vh;
     }
-    header { padding: 12px 16px; font-weight: 600; }
-    #viewer { flex: 1 1 auto; }
-    #controls {
-      padding: 10px 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
-      background: #f5f5f5; border-top: 1px solid #ddd;
-    }
+    header { grid-area: header; padding:12px 16px; background:var(--panel); border-bottom:1px solid var(--muted); font-weight:600; }
+    #sidebar { grid-area: sidebar; background: var(--panel); border-right:1px solid var(--muted); display:flex; flex-direction:column; }
+    #steps { list-style:none; padding:0; margin:0; }
+    #steps li { padding:12px 14px; border-bottom:1px dashed var(--muted); display:flex; align-items:center; gap:8px; }
+    #steps li.current { background:#eef2ff; border-left:4px solid var(--primary); }
+    #steps li.completed { color:#065f46; }
+    #steps li span.badge { margin-left:auto; font-size:12px; padding:2px 8px; border-radius:999px; background:var(--muted); }
+    #viewer { grid-area: main; position:relative; }
+    #canvasWrap { position:absolute; inset:0; }
+    #controls { grid-area: footer; padding:10px 16px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; background: var(--panel); border-top:1px solid var(--muted); }
     button {
-      padding: 10px 16px; font-size: 15px; cursor: pointer; background: #0078d7; color: #fff;
-      border: none; border-radius: 8px;
+      padding:10px 16px; font-size:15px; cursor:pointer; background: var(--primary); color:#fff;
+      border:none; border-radius:8px;
     }
-    button:hover { background: #005a9e; }
-    .status { font-size: 14px; color: #333; }
+    button:hover { background: var(--primary-dark); }
+    button.secondary { background:#6b7280; }
+    button.secondary:hover { background:#4b5563; }
+    button[disabled] { opacity:.5; cursor:not-allowed; }
+    .status { font-size:14px; color:#374151; }
+    /* Quiz modal */
+    #quizModal {
+      position: fixed; inset:0; background: rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; padding:16px;
+    }
+    #quizCard {
+      background:#fff; width:min(720px, 100%); border-radius:12px; box-shadow: 0 10px 30px rgba(0,0,0,.15);
+      padding:18px; display:flex; flex-direction:column; gap:14px;
+    }
+    .q { padding:12px; border:1px solid var(--muted); border-radius:8px; }
+    .choices { display:grid; gap:8px; margin-top:8px; }
+    label.choice { display:flex; gap:8px; align-items:flex-start; padding:8px; border:1px solid var(--muted); border-radius:8px; }
+    .quiz-footer { display:flex; gap:8px; justify-content:flex-end; }
+    .pill { font-size:12px; padding:2px 8px; border-radius:999px; background:#eef2ff; color:#1e3a8a; }
+    .good { color: var(--ok); }
+    .bad { color: var(--err); }
+    @media (max-width: 900px) {
+      body { grid-template-columns: 1fr; grid-template-areas:
+        "header" "main" "footer"; }
+      #sidebar { grid-area: header; overflow-x:auto; border-right:none; border-bottom:1px solid var(--muted); }
+      #steps { display:flex; }
+      #steps li { white-space:nowrap; border-bottom:none; border-right:1px dashed var(--muted); }
+    }
   </style>
 </head>
 <body>
-  <header>Construction pas à pas - BTP</header>
-  <div id="viewer"></div>
+  <div id="quizModal">
+    <div id="quizCard">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2 style="margin:0;">Quiz de l'étape <span id="quizStepLabel"></span></h2>
+        <span class="pill" id="quizRule">Répondez correctement à 2/3 questions</span>
+      </div>
+      <div id="quizContainer"></div>
+      <div class="quiz-footer">
+        <button class="secondary" id="quizCancel">Annuler</button>
+        <button id="quizValidate">Valider</button>
+      </div>
+      <div id="quizFeedback" style="min-height:20px;"></div>
+    </div>
+  </div>
+
+  <aside id="sidebar">
+    <div style="padding:12px 14px; font-weight:600;">Parcours chantier</div>
+    <ul id="steps"></ul>
+  </aside>
+
+  <header>Construction pas à pas — BTP</header>
+
+  <main id="viewer">
+    <div id="canvasWrap"></div>
+  </main>
+
   <div id="controls">
     <button id="prevStep">⬅ Étape précédente</button>
-    <button id="nextStep">Étape suivante ➡</button>
+    <button id="openQuiz">Lancer le quiz pour débloquer ➡</button>
     <span class="status" id="status">Prêt</span>
   </div>
 
-  <!-- ES Modules depuis unpkg -->
   <script type="module">
     import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
     import { OrbitControls } from "https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js";
     import { GLTFLoader } from "https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
     import { DRACOLoader } from "https://unpkg.com/three@0.160.0/examples/jsm/loaders/DRACOLoader.js";
 
-    // --- Variables de base
+    // --- Données des étapes (HUD) ---
+    const STEPS = [
+      "Terrassement",
+      "Fondations",
+      "Superstructure",
+      "Planchers",
+      "Murs",
+      "Menuiseries ext.",
+      "Toiture",
+      "Finitions"
+    ];
+    const totalSteps = STEPS.length;
+
+    // --- Banque de questions par étape (3 questions mini) ---
+    // Remplacez/complétez simplement les libellés et les réponses.
+    const QUIZ = {
+      1: [
+        { q: "Quel engin est le plus adapté pour décaper la terre végétale ?", choices: ["Mini-pelle", "Nacelle", "Grue à tour"], correct: 0 },
+        { q: "Le piquetage sert à :", choices: ["Repérer les réseaux enterrés", "Délimiter l’implantation du projet", "Réceptionner le béton"], correct: 1 },
+        { q: "Avant le terrassement, on vérifie :", choices: ["Les menuiseries", "Le plan de coffrage", "La nature du sol et les niveaux"], correct: 2 },
+      ],
+      2: [
+        { q: "Quel est l’ordre correct ?", choices: ["Coulage → Ferraillage → Coffrage", "Coffrage → Ferraillage → Coulage", "Ferraillage → Coulage → Coffrage"], correct: 1 },
+        { q: "Le béton de propreté sert à :", choices: ["Isoler les fondations de la terre", "Augmenter la résistance du béton", "Alléger la structure"], correct: 0 },
+        { q: "Élément assurant la répartition des charges :", choices: ["Longrine/Semelle", "Chevron", "Liteau"], correct: 0 },
+      ],
+      3: [
+        { q: "La superstructure correspond :", choices: ["Aux éléments enterrés", "À tout ce qui est au-dessus du sol", "Aux menuiseries intérieures"], correct: 1 },
+        { q: "Un voile en béton armé est :", choices: ["Un mur porteur", "Un plancher léger", "Une isolation"], correct: 0 },
+        { q: "Pour un mur porteur, on vérifie :", choices: ["L’aspect décoratif uniquement", "La section et l’armature (ou matériau)", "Le sens du vent"], correct: 1 },
+      ],
+      4: [
+        { q: "Un plancher collaborant associe :", choices: ["Bois + isolant", "Béton + treillis soudé uniquement", "Acier + béton",], correct: 2 },
+        { q: "Un étai sert à :", choices: ["Supporter provisoirement", "Découper du ferraillage", "Mesurer des niveaux"], correct: 0 },
+        { q: "On décoffre un plancher après :", choices: ["Prise suffisante du béton", "Pose des menuiseries", "Ragréage des sols"], correct: 0 },
+      ],
+      5: [
+        { q: "Un mur de refend :", choices: ["Est non porteur", "Est porteur intérieur", "Est un habillage"], correct: 1 },
+        { q: "La brique alvéolaire est surtout :", choices: ["Structure bois", "Maçonnerie", "Métallique"], correct: 1 },
+        { q: "Un linteau sert à :", choices: ["Finir un mur", "Porter au-dessus d’une baie", "Isoler une toiture"], correct: 1 },
+      ],
+      6: [
+        { q: "On pose une menuiserie extérieure :", choices: ["Avant les murs", "Après l’ouverture prête et l’étanchéité prévue", "Après la peinture"], correct: 1 },
+        { q: "Un dormant est :", choices: ["La partie fixe du châssis", "La poignée", "Le vitrage"], correct: 0 },
+        { q: "Afin d’éviter les ponts thermiques, on prévoit :", choices: ["Des chevilles plastiques", "Une rupture ou un calfeutrement adapté", "Un joint silicone décoratif seulement"], correct: 1 },
+      ],
+      7: [
+        { q: "Sur une charpente traditionnelle, on trouve :", choices: ["Pannes, chevrons, liteaux", "Solives, entrevous", "Raidisseurs, voiles"], correct: 0 },
+        { q: "L’écran sous-toiture :", choices: ["Assure l’étanchéité à l’air des menuiseries", "Protège la couverture et améliore l’étanchéité", "Sert d’isolation phonique"], correct: 1 },
+        { q: "Tuile ou bac acier : on choisit selon :", choices: ["La couleur du chantier", "Les charges, la pente, la zone", "Le prix le plus bas seulement"], correct: 1 },
+      ],
+      8: [
+        { q: "Ordre logique des finitions :", choices: ["Peinture → Enduits → Plomberie", "Enduits/Placo → Élec/Plomberie → Peinture", "Menuiseries int. → Gros œuvre → Carrelage"], correct: 1 },
+        { q: "Un joint de fractionnement sert à :", choices: ["Décorer le carrelage", "Absorber les mouvements", "Fixer les plinthes"], correct: 1 },
+        { q: "Pour la réception, on vérifie :", choices: ["Les réserves, la conformité, les essais", "Uniquement la couleur des murs", "Le prix des matériaux"], correct: 0 },
+      ]
+    };
+
+    // --- État ---
     let scene, camera, renderer, controls;
     let currentStep = 1;
-    const totalSteps = 8;
+    let unlockedStep = 1; // Dernière étape débloquée (via quiz)
     let currentModel = null;
-    const viewer = document.getElementById("viewer");
-    const statusEl = document.getElementById("status");
 
-    // --- Initialisation
-    init();
+    // --- Sélecteurs DOM ---
+    const canvasWrap = document.getElementById("canvasWrap");
+    const stepsEl = document.getElementById("steps");
+    const statusEl = document.getElementById("status");
+    const prevBtn = document.getElementById("prevStep");
+    const openQuizBtn = document.getElementById("openQuiz");
+    const quizModal = document.getElementById("quizModal");
+    const quizContainer = document.getElementById("quizContainer");
+    const quizValidate = document.getElementById("quizValidate");
+    const quizCancel = document.getElementById("quizCancel");
+    const quizStepLabel = document.getElementById("quizStepLabel");
+    const quizFeedback = document.getElementById("quizFeedback");
+
+    // --- UI initiale ---
+    renderHUD();
+    initThree();
     loadStep(currentStep);
 
-    function init() {
-      scene = new THREE.Scene();
-      scene.background = new THREE.Color(0xe6e6e6);
+    // --- HUD ---
+    function renderHUD() {
+      stepsEl.innerHTML = "";
+      STEPS.forEach((name, idx) => {
+        const stepIndex = idx + 1;
+        const li = document.createElement("li");
+        li.dataset.step = stepIndex;
+        li.className = stepIndex === currentStep ? "current" : (stepIndex < unlockedStep ? "completed" : "");
+        li.innerHTML = `<span>${stepIndex}. ${name}</span><span class="badge">${stepIndex < unlockedStep ? "OK" : (stepIndex === currentStep ? "en cours" : "")}</span>`;
+        li.addEventListener("click", () => {
+          if (stepIndex <= unlockedStep) {
+            currentStep = stepIndex;
+            updateHUDStates();
+            loadStep(currentStep);
+          }
+        });
+        stepsEl.appendChild(li);
+      });
+      updateButtons();
+    }
 
-      const rect = viewer.getBoundingClientRect();
+    function updateHUDStates() {
+      Array.from(stepsEl.children).forEach(li => {
+        const step = Number(li.dataset.step);
+        li.className = step === currentStep ? "current" : (step < unlockedStep ? "completed" : "");
+        const badge = li.querySelector(".badge");
+        if (badge) badge.textContent = step < unlockedStep ? "OK" : (step === currentStep ? "en cours" : "");
+      });
+      updateButtons();
+    }
+
+    function updateButtons() {
+      prevBtn.disabled = currentStep <= 1;
+      // Le bouton "openQuiz" sert à débloquer l'étape suivante
+      openQuizBtn.disabled = currentStep >= totalSteps || unlockedStep < currentStep;
+      openQuizBtn.textContent = currentStep >= totalSteps ? "Dernière étape atteinte" : "Lancer le quiz pour débloquer ➡";
+    }
+
+    // --- THREE ---
+    function initThree() {
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xf3f4f6);
+
+      const rect = canvasWrap.getBoundingClientRect();
       const aspect = rect.width / Math.max(1, rect.height || window.innerHeight * 0.7);
       camera = new THREE.PerspectiveCamera(50, aspect, 0.01, 2000);
       camera.position.set(6, 5, 9);
@@ -66,24 +236,20 @@
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.setSize(rect.width, rect.height || window.innerHeight * 0.7);
       renderer.outputColorSpace = THREE.SRGBColorSpace;
-      viewer.appendChild(renderer.domElement);
+      canvasWrap.appendChild(renderer.domElement);
 
-      // Lumières
       const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
       hemi.position.set(0, 1, 0);
       scene.add(hemi);
 
       const dir = new THREE.DirectionalLight(0xffffff, 1.0);
       dir.position.set(5, 10, 7);
-      dir.castShadow = false;
       scene.add(dir);
 
-      // Grille sol (facultatif)
       const grid = new THREE.GridHelper(50, 50, 0xaaaaaa, 0xdddddd);
-      grid.material.opacity = 0.35; grid.material.transparent = true;
+      grid.material.opacity = 0.3; grid.material.transparent = true;
       scene.add(grid);
 
-      // Contrôles
       controls = new OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true;
       controls.dampingFactor = 0.08;
@@ -94,23 +260,22 @@
         renderer.render(scene, camera);
       });
 
-      // Boutons
-      document.getElementById("nextStep").addEventListener("click", () => {
-        if (currentStep < totalSteps) {
-          currentStep++;
-          loadStep(currentStep);
-        }
-      });
-      document.getElementById("prevStep").addEventListener("click", () => {
+      prevBtn.addEventListener("click", () => {
         if (currentStep > 1) {
           currentStep--;
+          updateHUDStates();
           loadStep(currentStep);
         }
       });
+
+      openQuizBtn.addEventListener("click", openQuiz);
+      quizValidate.addEventListener("click", validateQuiz);
+      quizCancel.addEventListener("click", closeQuiz);
+      quizModal.addEventListener("click", (e) => { if (e.target === quizModal) closeQuiz(); });
     }
 
     function onResize() {
-      const rect = viewer.getBoundingClientRect();
+      const rect = canvasWrap.getBoundingClientRect();
       const w = rect.width || window.innerWidth;
       const h = rect.height || Math.max(1, window.innerHeight * 0.7);
       camera.aspect = w / h;
@@ -118,15 +283,12 @@
       renderer.setSize(w, h);
     }
 
-    function setStatus(text) {
-      statusEl.textContent = text;
-    }
+    function setStatus(text) { statusEl.textContent = text; }
 
     function loadStep(step) {
       const modelPath = `./models/etape${step}.glb`;
       setStatus(`Chargement : ${modelPath} …`);
 
-      // Nettoyage modèle précédent
       if (currentModel) {
         scene.remove(currentModel);
         currentModel.traverse(o => {
@@ -140,8 +302,6 @@
       }
 
       const loader = new GLTFLoader();
-
-      // Support DRACO si vos .glb sont compressés
       const dracoLoader = new DRACOLoader();
       dracoLoader.setDecoderPath("https://www.gstatic.com/draco/v1/decoders/");
       loader.setDRACOLoader(dracoLoader);
@@ -151,17 +311,15 @@
         (gltf) => {
           currentModel = gltf.scene;
           scene.add(currentModel);
-
-          // sRGB pour textures
           currentModel.traverse((obj) => {
             if (obj.isMesh && obj.material) {
               if (obj.material.map) obj.material.map.colorSpace = THREE.SRGBColorSpace;
               if (obj.material.emissiveMap) obj.material.emissiveMap.colorSpace = THREE.SRGBColorSpace;
             }
           });
-
           frameObject(currentModel);
-          setStatus(`Affiché : ${modelPath} (étape ${step}/${totalSteps})`);
+          setStatus(`Affiché : ${STEPS[step-1]} (${step}/${totalSteps}) — ${modelPath}`);
+          updateButtons();
         },
         (xhr) => {
           const pct = xhr.total ? Math.round((xhr.loaded / xhr.total) * 100) : 0;
@@ -169,37 +327,89 @@
         },
         (err) => {
           console.error(`Erreur lors du chargement de ${modelPath}`, err);
-          setStatus(`⚠️ Impossible de charger ${modelPath} (voir console). Vérifiez le nom et l'emplacement.`);
+          setStatus(`⚠️ Impossible de charger ${modelPath}.`);
         }
       );
     }
 
-    // --- Cadrage automatique de la caméra ---
+    // --- Cadrage automatique ---
     function frameObject(object3D) {
       const box = new THREE.Box3().setFromObject(object3D);
       if (box.isEmpty()) return;
-
       const size = box.getSize(new THREE.Vector3());
       const center = box.getCenter(new THREE.Vector3());
 
-      // Cible des contrôles = centre du modèle
       controls.target.copy(center);
 
-      // Calcul d'une distance idéale en fonction de la taille max du modèle
       const maxDim = Math.max(size.x, size.y, size.z);
-      const fov = THREE.MathUtils.degToRad(camera.fov); // en radians
-      // distance pour faire rentrer la bounding-sphere dans le frustum vertical
-      const distance = (maxDim / 2) / Math.tan(fov / 2) * 1.3; // marge 30%
+      const fov = THREE.MathUtils.degToRad(camera.fov);
+      const distance = (maxDim / 2) / Math.tan(fov / 2) * 1.3;
 
-      // Direction de vue oblique "3/4"
       const dir = new THREE.Vector3(1, 0.8, 1).normalize();
       camera.position.copy(center).addScaledVector(dir, distance);
-
-      // Plans de clipping adaptés
       camera.near = Math.max(0.01, maxDim / 1000);
       camera.far = distance * 10;
       camera.updateProjectionMatrix();
       controls.update();
+    }
+
+    // --- Quiz ---
+    function openQuiz() {
+      const step = currentStep + 1;
+      if (step > totalSteps) return;
+      quizStepLabel.textContent = `${step} — ${STEPS[step-1]}`;
+      quizFeedback.textContent = "";
+      renderQuiz(step);
+      quizModal.style.display = "flex";
+    }
+    function closeQuiz() { quizModal.style.display = "none"; }
+
+    function renderQuiz(step) {
+      const questions = QUIZ[step] || [];
+      // Choisir 3 questions (ou moins si non disponible)
+      const selected = questions.slice(0, 3);
+      quizContainer.innerHTML = "";
+      selected.forEach((item, idx) => {
+        const qDiv = document.createElement("div");
+        qDiv.className = "q";
+        qDiv.innerHTML = `<div><strong>Q${idx+1}.</strong> ${item.q}</div>`;
+        const choicesDiv = document.createElement("div");
+        choicesDiv.className = "choices";
+        item.choices.forEach((choiceText, cidx) => {
+          const id = `q${idx}_c${cidx}`;
+          const label = document.createElement("label");
+          label.className = "choice";
+          label.setAttribute("for", id);
+          label.innerHTML = `<input type="radio" name="q${idx}" id="${id}" value="${cidx}"/> ${choiceText}`;
+          choicesDiv.appendChild(label);
+        });
+        qDiv.appendChild(choicesDiv);
+        quizContainer.appendChild(qDiv);
+      });
+      quizContainer.dataset.step = String(step);
+    }
+
+    function validateQuiz() {
+      const step = Number(quizContainer.dataset.step);
+      const items = QUIZ[step] || [];
+      const selected = items.slice(0,3);
+      let correct = 0;
+      selected.forEach((item, idx) => {
+        const inputs = document.querySelectorAll(`input[name="q${idx}"]`);
+        let val = -1;
+        inputs.forEach(i => { if (i.checked) val = Number(i.value); });
+        if (val === item.correct) correct++;
+      });
+      if (correct >= 2) {
+        quizFeedback.innerHTML = `<span class="good">✔ Bonnes réponses : ${correct}/3. Étape débloquée.</span>`;
+        unlockedStep = Math.max(unlockedStep, step);
+        currentStep = step;
+        updateHUDStates();
+        loadStep(currentStep);
+        setTimeout(() => { closeQuiz(); }, 800);
+      } else {
+        quizFeedback.innerHTML = `<span class="bad">✖ Seulement ${correct}/3. Réessayez.</span>`;
+      }
     }
   </script>
 </body>
