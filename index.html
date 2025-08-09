@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Jeu pédagogique 3D (.OBJ) – Phases + Score</title>
+  <meta name="description" content="Jeu pédagogique 3D pour fichiers OBJ : phases de construction, score, timer, objectifs. Prêt pour GitHub Pages." />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="topbar">
+    <div class="left">
+      <label class="btn" for="objFile">📁 OBJ</label>
+      <input id="objFile" type="file" accept=".obj" />
+      <label class="btn" for="mtlFile">📦 MTL (opt.)</label>
+      <input id="mtlFile" type="file" accept=".mtl" />
+      <button id="fit" class="btn">🎯 Recentrer</button>
+      <button id="wire" class="btn">🧵 Fil de fer</button>
+      <button id="showAll" class="btn">👁️ Tout afficher</button>
+      <button id="clip" class="btn">✂️ Coupe</button>
+      <button id="clipClear" class="btn">❌ Retirer coupes</button>
+    </div>
+    <div class="right">
+      <span class="kpi">Statut: <strong id="st">prêt</strong></span>
+      <span id="msg" class="hint"></span>
+    </div>
+  </div>
+
+  <div id="gamebar">
+    <span class="phase-pill">Phase : <strong id="phaseName">—</strong></span>
+    <span class="kpi">⏱️ Temps : <strong id="timer">00:00</strong></span>
+    <span class="kpi">⭐ Score : <strong id="score">0</strong></span>
+    <span class="kpi">🎯 Objectif : <strong id="goal">0</strong>/<span id="goalTotal">0</span></span>
+    <button id="start" class="btn">▶️ Démarrer</button>
+    <button id="pause" class="btn" disabled>⏸️ Pause</button>
+    <button id="resume" class="btn" disabled>⏯️ Reprendre</button>
+    <button id="reset" class="btn" disabled>🔁 Réinitialiser</button>
+    <button id="exportCsv" class="btn" disabled>📤 Export résultats</button>
+  </div>
+
+  <div id="columns">
+    <aside id="sidebar">
+      <h3>Phases & mappage</h3>
+      <div class="hint">Le jeu tente de deviner les phases via les noms d'objets (regex). Vous pouvez corriger en sélectionnant des objets et en cliquant « Assigner ».</div>
+      <div id="phaseList"></div>
+      <div class="row">
+        <select id="phaseSelect"></select>
+        <button id="assignSel" class="btn">Assigner sélection</button>
+        <button id="clearSel" class="btn">Effacer sélection</button>
+      </div>
+      <div class="row">
+        <button id="exportMap" class="btn">💾 Exporter mappage</button>
+        <input id="importMapFile" type="file" accept=".json" style="display:none" />
+        <label for="importMapFile" class="btn">📥 Importer mappage</label>
+      </div>
+      <h3>Journal</h3>
+      <pre id="log"></pre>
+      <h3>Astuce</h3>
+      <p class="hint">Paramètres d’URL : <code>?obj=modele.obj&mtl=modele.mtl</code></p>
+    </aside>
+
+    <div id="viewport"></div>
+  </div>
+
+  <dialog id="endDialog">
+    <h2>Fin de partie 🎉</h2>
+    <p id="endMsg"></p>
+    <div class="row">
+      <button id="endClose" class="btn">Fermer</button>
+      <button id="endExport" class="btn">Exporter CSV</button>
+      <button id="endReset" class="btn">Recommencer</button>
+    </div>
+  </dialog>
+
+  <script type="module" src="js/game.js"></script>
+</body>
+</html>
